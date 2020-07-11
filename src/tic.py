@@ -451,7 +451,7 @@ class TicBase(object):
   # command will be silently ignored.
   #
   # See also deenergize().
-  def haltAndHold():
+  def haltAndHold(self):
     self.commandQuick(TicCommand.HaltAndHold)
 
   # Tells the Tic to start its homing procedure in the reverse direction.
@@ -478,7 +478,7 @@ class TicBase(object):
   # ```
   #
   # This function sends a "Reset command timeout" command to the Tic.
-  def resetCommandTimeout():
+  def resetCommandTimeout(self):
     self.commandQuick(TicCommand.ResetCommandTimeout)
 
   # De-energizes the stepper motor coils.
@@ -1292,7 +1292,7 @@ class TicSerial(TicBase):
   # TicSerial tic2(ticSerial, 15)
   # ```
   def __init__(self, iodev, deviceNumber = 255):
-    self._iodev = iodev
+    self._iodev = serial.Serial(iodev, 115200)
     self._deviceNumber = deviceNumber
 
   # Gets the serial device number specified in the constructor.
@@ -1303,7 +1303,7 @@ class TicSerial(TicBase):
     self.sendCommandHeader(cmd)
 
   def serialW7(self, val):
-    self._iodev.write(val & 0x7F)
+    self._iodev.write([val & 0x7F])
 
   def commandW32(self, cmd, val):
     self.sendCommandHeader(cmd)
@@ -1346,16 +1346,23 @@ class TicSerial(TicBase):
     self._lastError = 0
     return bytes
 
-  def sendCommandHeader(cmd):
-    if (_deviceNumber == 255):
+  def sendCommandHeader(self, cmd):
+    if (self._deviceNumber == 255):
       # Compact protocol
-      self._iodev.write(cmd)
+      self._iodev.write([cmd])
     else:
       # Pololu protocol
-      self._iodev.write(0xAA)
+      self._iodev.write([0xAA])
       self.serialW7(_deviceNumber)
       self.serialW7(cmd)
-    _lastError = 0
+    self._lastError = 0
 
 if __name__ == "__main__":
+  # s = serial.Serial("/dev/ttyUSB0", 115200)
+  # s.write([0xff])
   tic = TicSerial("/dev/ttyUSB0")
+  tic.haltAndHold()
+  time.sleep(0.1)
+  tic.setStepMode(TicStepMode.Microstep8)
+  time.sleep(0.1)
+  tic.setTargetPosition(1234567890)
