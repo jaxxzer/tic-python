@@ -1292,7 +1292,7 @@ class TicSerial(TicBase):
   # TicSerial tic2(ticSerial, 15)
   # ```
   def __init__(self, iodev, deviceNumber = 255):
-    self._iodev = serial.Serial(iodev, 115200)
+    self._iodev = serial.Serial(iodev, 9600)
     self._deviceNumber = deviceNumber
 
   # Gets the serial device number specified in the constructor.
