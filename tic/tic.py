@@ -1171,6 +1171,8 @@ class TicBase(object):
 
   def getVar32(self, offset):
     buffer = self.getSegment(TicCommand.GetVariable, offset, 4)
+    if buffer is None:
+      return None
     return ((buffer[0] << 0) |
       (buffer[1] << 8) |
       (buffer[2] << 16) |
@@ -1293,6 +1295,7 @@ class TicSerial(TicBase):
   # ```
   def __init__(self, iodev, deviceNumber = 255):
     self._iodev = serial.Serial(iodev, 9600)
+    self._iodev.timeout = 0.1
     self._deviceNumber = deviceNumber
 
   # Gets the serial device number specified in the constructor.
@@ -1337,11 +1340,11 @@ class TicSerial(TicBase):
     self.serialW7(length | (offset >> 1 & 0x40))
 
     bytes = self._iodev.read(length)
-    if (length(bytes) != length):
+    if (len(bytes) != length):
       self._lastError = 50
       # Set the buffer bytes to 0 so the program will not use an uninitialized
       # variable.
-      return []
+      return None
 
     self._lastError = 0
     return bytes
