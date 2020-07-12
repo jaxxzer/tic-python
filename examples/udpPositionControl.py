@@ -1,12 +1,12 @@
-from tic import TicSerial
+from tic import TicUdp
 import time
 
 def waitForPosition(targetPosition):
     while (tic.getCurrentPosition() != targetPosition):
         tic.resetCommandTimeout()
-        time.sleep(0.001)
+        time.sleep(0.05)
 
-tic = TicSerial("/dev/ttyUSB0")
+tic = TicUdp("0.0.0.0", 4444)
 
 # Set the Tic's current position to 0, so that when we command
 # it to move later, it will move a predictable amount.

@@ -1,5 +1,6 @@
 import time
 import serial
+import socket
 
 # Copyright (C) Pololu Corporation.  See LICENSE.txt for details.
 
@@ -1178,14 +1179,68 @@ class TicBase(object):
       (buffer[2] << 16) |
       (buffer[3] << 24))
 
+  def read(self, length):
+    raise NotImplementedError()
+  def write(self, buffer):
+    raise NotImplementedError()
+
   def commandQuick(self, cmd):
-    raise NotImplementedError()
+    self.sendCommandHeader(cmd)
+
+  def serialW7(self, val):
+    self.write(bytes([val & 0x7F]))
+
   def commandW32(self, cmd, val):
-    raise NotImplementedError()
+    self.sendCommandHeader(cmd)
+
+    # byte with MSbs:
+    # bit 0 = MSb of first (least significant) data byte
+    # bit 1 = MSb of second data byte
+    # bit 2 = MSb of third data byte
+    # bit 3 = MSb of fourth (most significant) data byte
+    self.serialW7(((val >>  7) & 1) |
+            ((val >> 14) & 2) |
+            ((val >> 21) & 4) |
+            ((val >> 28) & 8))
+
+    self.serialW7(val >> 0) # least significant byte with MSb cleared
+    self.serialW7(val >> 8)
+    self.serialW7(val >> 16)
+    self.serialW7(val >> 24) # most significant byte with MSb cleared
+
+    self._lastError = 0
+
   def commandW7(self, cmd, val):
-    raise NotImplementedError()
+    self.sendCommandHeader(cmd)
+    self.serialW7(val)
+    self._lastError = 0
+
   def getSegment(self, cmd, offset, length):
-    raise NotImplementedError()
+    length &= 0x3F
+    self.sendCommandHeader(cmd)
+    self.serialW7(offset & 0x7F)
+    self.serialW7(length | (offset >> 1 & 0x40))
+
+    bytes = self.read(length)
+    if (len(bytes) != length):
+      self._lastError = 50
+      # Set the buffer bytes to 0 so the program will not use an uninitialized
+      # variable.
+      return None
+
+    self._lastError = 0
+    return bytes
+
+  def sendCommandHeader(self, cmd):
+    if (self._deviceNumber == 255):
+      # Compact protocol
+      self.write(bytes([cmd]))
+    else:
+      # Pololu protocol
+      self.write(bytes([0xAA]))
+      self.serialW7(_deviceNumber)
+      self.serialW7(cmd)
+    self._lastError = 0
 
   # Gets the stepper motor coil current limit in milliamps.
   #
@@ -1260,8 +1315,6 @@ class TicBase(object):
 
     self.commandW7(TicCommand.SetCurrentLimit, code)
 
-
-
 # Represents a serial connection to a Tic.
 #
 # For the high-level commands you can use on this object, see TicBase.
@@ -1302,63 +1355,61 @@ class TicSerial(TicBase):
   def getDeviceNumber(self):
     return self._deviceNumber 
 
-  def commandQuick(self, cmd):
-    self.sendCommandHeader(cmd)
+  def read(self, length):
+    return self._iodev.read(length)
+  
+  def write(self, buffer):
+    self._iodev.write(buffer)
 
-  def serialW7(self, val):
-    self._iodev.write([val & 0x7F])
+# Represents a serial connection to a Tic.
+#
+# For the high-level commands you can use on this object, see TicBase.
+class TicUdp(TicBase):
+  # Creates a new TicSerial object.
+  #
+  # The `stream` argument should be a hardware or software serial object.
+  # This class will store a pointer to it and use it to communicate with the
+  # Tic.  You should initialize it and set it to use the correct baud rate
+  # before sending commands with this class.
+  #
+  # The `deviceNumber` argument is optional.  If it is omitted or 255, the
+  # TicSerial object will use the compact protocol.  If it is a number between
+  # 0 and 127, it specifies the device number to use in Pololu protocol,
+  # allowing you to control multiple Tic controllers on a single serial bus.
+  #
+  # For example, to use the first open hardware serial port to send compact
+  # protocol commands to one Tic, write this at the top of your sketch:
+  # ```
+  # TicSerial tic(SERIAL_PORT_HARDWARE_OPEN)
+  # ```
+  #
+  # For example, to use a SoftwareSerial port and send Pololu protocol
+  # commands to two different Tic controllers, write this at the top of your sketch:
+  #
+  # ```
+  # #include <SoftwareSerial.h>
+  # SoftwareSerial ticSerial(10, 11)
+  # TicSerial tic1(ticSerial, 14)
+  # TicSerial tic2(ticSerial, 15)
+  # ```
+  def __init__(self, host, port, deviceNumber = 255):
+    self._deviceNumber = deviceNumber
+    self._server_address = (host, port)
+    self._iodev = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    self._iodev.setblocking(0)
 
-  def commandW32(self, cmd, val):
-    self.sendCommandHeader(cmd)
+  # Gets the serial device number specified in the constructor.
+  def getDeviceNumber(self):
+    return self._deviceNumber 
 
-    # byte with MSbs:
-    # bit 0 = MSb of first (least significant) data byte
-    # bit 1 = MSb of second data byte
-    # bit 2 = MSb of third data byte
-    # bit 3 = MSb of fourth (most significant) data byte
-    self.serialW7(((val >>  7) & 1) |
-            ((val >> 14) & 2) |
-            ((val >> 21) & 4) |
-            ((val >> 28) & 8))
-
-    self.serialW7(val >> 0) # least significant byte with MSb cleared
-    self.serialW7(val >> 8)
-    self.serialW7(val >> 16)
-    self.serialW7(val >> 24) # most significant byte with MSb cleared
-
-    self._lastError = 0
-
-  def commandW7(self, cmd, val):
-    self.sendCommandHeader(cmd)
-    self.serialW7(val)
-    self._lastError = 0
-
-  def getSegment(self, cmd, offset, length):
-    length &= 0x3F
-    self.sendCommandHeader(cmd)
-    self.serialW7(offset & 0x7F)
-    self.serialW7(length | (offset >> 1 & 0x40))
-
-    bytes = self._iodev.read(length)
-    if (len(bytes) != length):
-      self._lastError = 50
-      # Set the buffer bytes to 0 so the program will not use an uninitialized
-      # variable.
-      return None
-
-    self._lastError = 0
-    return bytes
-
-  def sendCommandHeader(self, cmd):
-    if (self._deviceNumber == 255):
-      # Compact protocol
-      self._iodev.write([cmd])
-    else:
-      # Pololu protocol
-      self._iodev.write([0xAA])
-      self.serialW7(_deviceNumber)
-      self.serialW7(cmd)
-    self._lastError = 0
+  def read(self, length):
+    try:
+      return self._iodev.recv(length)
+    except BlockingIOError as exception:
+      return bytes()
+  
+  def write(self, buffer):
+    self._iodev.sendto(buffer, self._server_address)
 
 if __name__ == "__main__":
   # s = serial.Serial("/dev/ttyUSB0", 115200)
