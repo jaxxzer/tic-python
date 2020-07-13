@@ -1,6 +1,7 @@
 import time
 import serial
 import socket
+import struct
 
 # Copyright (C) Pololu Corporation.  See LICENSE.txt for details.
 
@@ -796,7 +797,9 @@ class TicBase(object):
   #
   # See also setTargetPosition().
   def getTargetPosition(self):
-    return self.getVar32(VarOffset.TargetPosition)
+    p =  self.getVar32(VarOffset.TargetPosition, True)
+    print("targetp:", p)
+    return p
 
   # Gets the target velocity, in microsteps per 10000 seconds.
   #
@@ -869,7 +872,9 @@ class TicBase(object):
   #
   # See also haltAndSetPosition().
   def getCurrentPosition(self):
-    return self.getVar32(VarOffset.CurrentPosition)
+    p = self.getVar32(VarOffset.CurrentPosition, True)
+    print("current p:", p)
+    return p
 
   # Gets the current velocity of the stepper motor, in microsteps per 10000
   # seconds.
@@ -1170,10 +1175,13 @@ class TicBase(object):
     buffer = self.getSegment(TicCommand.GetVariable, offset, 2)
     return (buffer[0] << 0) | (buffer[1] << 8)
 
-  def getVar32(self, offset):
+  def getVar32(self, offset, signed=False):
     buffer = self.getSegment(TicCommand.GetVariable, offset, 4)
+    print("var32:", buffer)
     if buffer is None:
       return None
+    if signed:
+        return struct.unpack("<l", buffer)[0]
     return ((buffer[0] << 0) |
       (buffer[1] << 8) |
       (buffer[2] << 16) |
@@ -1191,23 +1199,23 @@ class TicBase(object):
     self.write(bytes([val & 0x7F]))
 
   def commandW32(self, cmd, val):
-    self.sendCommandHeader(cmd)
-
+    #self.sendCommandHeader(cmd)
+    b0 = cmd
     # byte with MSbs:
     # bit 0 = MSb of first (least significant) data byte
     # bit 1 = MSb of second data byte
     # bit 2 = MSb of third data byte
     # bit 3 = MSb of fourth (most significant) data byte
-    self.serialW7(((val >>  7) & 1) |
+    b1 = (((val >>  7) & 1) |
             ((val >> 14) & 2) |
             ((val >> 21) & 4) |
-            ((val >> 28) & 8))
+            ((val >> 28) & 8)) & 0x7F
 
-    self.serialW7(val >> 0) # least significant byte with MSb cleared
-    self.serialW7(val >> 8)
-    self.serialW7(val >> 16)
-    self.serialW7(val >> 24) # most significant byte with MSb cleared
-
+    b2 = (val >> 0) & 0x7F # least significant byte with MSb cleared
+    b3 = (val >> 8) & 0x7F
+    b4 = (val >> 16) & 0x7F
+    b5 = (val >> 24) & 0x7F # most significant byte with MSb cleared
+    self.write(bytes([b0, b1, b2, b3, b4, b5]))
     self._lastError = 0
 
   def commandW7(self, cmd, val):
@@ -1220,8 +1228,9 @@ class TicBase(object):
     self.sendCommandHeader(cmd)
     self.serialW7(offset & 0x7F)
     self.serialW7(length | (offset >> 1 & 0x40))
-
+    #time.sleep(0.1)
     bytes = self.read(length)
+    print("segment:", bytes)
     if (len(bytes) != length):
       self._lastError = 50
       # Set the buffer bytes to 0 so the program will not use an uninitialized
@@ -1396,19 +1405,24 @@ class TicUdp(TicBase):
     self._deviceNumber = deviceNumber
     self._server_address = (host, port)
     self._iodev = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    self._iodev.connect(self._server_address)
     self._iodev.setblocking(0)
 
   # Gets the serial device number specified in the constructor.
   def getDeviceNumber(self):
-    return self._deviceNumber 
+    return self._deviceNumber
 
   def read(self, length):
     try:
-      return self._iodev.recv(length)
+      b = self._iodev.recv(length)
+      #self._iodev.recv(2048)
+      print("udp got", b)
+      return b
     except BlockingIOError as exception:
       return bytes()
   
   def write(self, buffer):
+    print("sending", buffer.hex())
     self._iodev.sendto(buffer, self._server_address)
 
 if __name__ == "__main__":
