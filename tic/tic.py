@@ -798,7 +798,6 @@ class TicBase(object):
   # See also setTargetPosition().
   def getTargetPosition(self):
     p =  self.getVar32(VarOffset.TargetPosition, True)
-    print("targetp:", p)
     return p
 
   # Gets the target velocity, in microsteps per 10000 seconds.
@@ -873,7 +872,6 @@ class TicBase(object):
   # See also haltAndSetPosition().
   def getCurrentPosition(self):
     p = self.getVar32(VarOffset.CurrentPosition, True)
-    print("current p:", p)
     return p
 
   # Gets the current velocity of the stepper motor, in microsteps per 10000
@@ -1177,7 +1175,6 @@ class TicBase(object):
 
   def getVar32(self, offset, signed=False):
     buffer = self.getSegment(TicCommand.GetVariable, offset, 4)
-    print("var32:", buffer)
     if buffer is None:
       return None
     if signed:
@@ -1230,7 +1227,6 @@ class TicBase(object):
     self.serialW7(length | (offset >> 1 & 0x40))
     #time.sleep(0.1)
     bytes = self.read(length)
-    print("segment:", bytes)
     if (len(bytes) != length):
       self._lastError = 50
       # Set the buffer bytes to 0 so the program will not use an uninitialized
@@ -1406,7 +1402,8 @@ class TicUdp(TicBase):
     self._server_address = (host, port)
     self._iodev = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     self._iodev.connect(self._server_address)
-    self._iodev.setblocking(0)
+    # self._iodev.setblocking(0)
+    self._iodev.settimeout(0.1)
 
   # Gets the serial device number specified in the constructor.
   def getDeviceNumber(self):
@@ -1416,13 +1413,13 @@ class TicUdp(TicBase):
     try:
       b = self._iodev.recv(length)
       #self._iodev.recv(2048)
-      print("udp got", b)
+      print("read", b.hex())
       return b
     except BlockingIOError as exception:
       return bytes()
   
   def write(self, buffer):
-    print("sending", buffer.hex())
+    print("write", buffer.hex())
     self._iodev.sendto(buffer, self._server_address)
 
 if __name__ == "__main__":
