@@ -1,2 +1,3 @@
 # 'tic-python package'
-from tic.tic import *
+from .tic import *
+from .ticproxy import TicProxy
