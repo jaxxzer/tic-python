@@ -1413,13 +1413,13 @@ class TicUdp(TicBase):
     try:
       b = self._iodev.recv(length)
       #self._iodev.recv(2048)
-      print("read", b.hex())
+      #print("read", b.hex())
       return b
     except BlockingIOError as exception:
       return bytes()
   
   def write(self, buffer):
-    print("write", buffer.hex())
+    #print("write", buffer.hex())
     self._iodev.sendto(buffer, self._server_address)
 
 if __name__ == "__main__":
