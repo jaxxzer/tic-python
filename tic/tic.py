@@ -714,7 +714,7 @@ class TicBase(object):
   # Returns true if the motor driver is energized (trying to send current to
   # its outputs).
   def getEnergized(self):
-    return selfgetVar8(VarOffset.MiscFlags1) >> TicMiscFlags1.Energized & 1
+    return self.getVar8(VarOffset.MiscFlags1) >> TicMiscFlags1.Energized & 1
 
   # Gets a flag that indicates whether there has been external confirmation that
   # the value of the Tic's "Current position" variable is correct.
