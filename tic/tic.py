@@ -1167,7 +1167,7 @@ class TicBase(object):
     self.product = TicProduct.Unknown
 
   def getVar8(self, offset):
-    return self.getSegment(TicCommand.GetVariable, offset, 1)
+    return self.getSegment(TicCommand.GetVariable, offset, 1)[0]
 
   def getVar16(self, offset):
     buffer = self.getSegment(TicCommand.GetVariable, offset, 2)
