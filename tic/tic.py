@@ -1317,7 +1317,7 @@ class TicBase(object):
           code = code + 1
     else:
       code = limit / TicCurrentUnits
-
+    code = round(code)
     self.commandW7(TicCommand.SetCurrentLimit, code)
 
 # Represents a serial connection to a Tic.
