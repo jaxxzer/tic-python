@@ -1304,9 +1304,9 @@ class TicBase(object):
           code = i
         else:
           break
-    elif (product == TicProduct.T249):
+    elif (self.product == TicProduct.T249):
       code = limit / TicT249CurrentUnits
-    elif (product == TicProduct.Tic36v4):
+    elif (self.product == TicProduct.Tic36v4):
       if (limit < 72):
         code = 0
       elif (limit >= 9095):
